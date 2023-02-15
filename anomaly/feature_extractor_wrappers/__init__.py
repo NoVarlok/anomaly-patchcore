@@ -1,0 +1,2 @@
+from .base_feature_extractor import BaseFeatureExtractor
+from .resnet_feature_extractor import ResNetFeatureExtractor
