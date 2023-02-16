@@ -31,19 +31,21 @@ class MVTecDataset():
             defect_dir = os.path.join(self.img_path, defect_type)
             imgs = sorted(os.listdir(defect_dir))
             imgs = [x for x in imgs if x.endswith('.png') or x.endswith('.jpg')]
+            imgs = [os.path.join(defect_dir, x) for x in imgs]
 
             img_paths.extend(imgs)
-            types.extend([defect_type] * len(img_paths))
+            types.extend([defect_type] * len(imgs))
 
             if defect_type == 'good':
-                gt_paths.extend([0] * len(img_paths))
-                labels.extend([0] * len(img_paths))
+                gt_paths.extend([0] * len(imgs))
+                labels.extend([0] * len(imgs))
             else:
                 gt_dir = os.path.join(self.gt_path, defect_type)
                 gt_imgs = sorted(os.listdir(gt_dir))
                 gt_imgs = [x for x in gt_imgs if x.endswith('.png') or x.endswith('.jpg')]
+                gt_imgs = [os.path.join(gt_dir, x) for x in gt_imgs]
                 gt_paths.extend(gt_imgs)
-                labels.extend([1] * len(img_paths))
+                labels.extend([1] * len(gt_imgs))
         
         assert len(img_paths) == len(gt_paths), "Something wrong with test and ground truth pair!"
         return img_paths, gt_paths, labels, types
@@ -55,16 +57,16 @@ class MVTecDataset():
         img_path, gt, label, img_type = self.img_paths[idx], self.gt_paths[idx], self.labels[idx], self.types[idx]
         # img = cv2.imread(img_path)
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = img = Image.open(img_path).convert('RGB')
+        img = Image.open(img_path).convert('RGB')
         if self.transform:
-            img = self.transform(img)[0]
+            img = self.transform(img)
         
         if gt == 0:
             gt = np.zeros((1, np.array(img).shape[-2], np.array(img).shape[-2])).tolist()
         else:
             gt = Image.open(gt)
             if self.gt_transform:
-                gt = self.gt_transform(gt)[0]
+                gt = self.gt_transform(gt)
         
         return img, gt, label, idx
     
@@ -94,6 +96,6 @@ def createDatasets(dataset_root_path, category):
 def createDatasetDataloaders(dataset_root_path, category, batch_size):
     train_dataset, test_dataset = createDatasets(dataset_root_path, category)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
     return train_dataloader, test_dataloader
          
