@@ -38,8 +38,9 @@ class Patchcore:
         with torch.no_grad():
             for i, data in enumerate(data_loader):
                 img, gt, label, idx = data
+                img = img.to(self.device)
                 features = self.feature_extractor(img)
-                embedding = embedding_concat(features[0], features[1]).numpy()
+                embedding = embedding_concat(features[0].cpu(), features[1].cpu()).numpy()
                 embedding = reshape_embedding(embedding)
                 embedding_list.extend(embedding)
 
@@ -58,10 +59,11 @@ class Patchcore:
     def predict(self, data):
         assert len(data.shape) == 4
         assert data.shape[0] == 1
+        data = data.to(self.device)
         features = self.feature_extractor(data)
         embedding = embedding_concat(features[0], features[1])
         embedding = reshape_embedding(embedding)
-        embedding = torch.stack(embedding)
+        embedding = torch.stack(embedding).cpu()
         distances = torch.cdist(embedding, self.embedding_coreset, p=2)
         score_patches, _ = torch.topk(distances, k=9, largest=False)
         score_patches = score_patches.numpy()
