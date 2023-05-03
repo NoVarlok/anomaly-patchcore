@@ -16,9 +16,6 @@ from torchvision.models import resnet50, ResNet50_Weights
 from tqdm import tqdm
 
 
-seed_everything(42)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Videos to images')
     parser.add_argument('--dataset_dir', type=str)
@@ -32,6 +29,7 @@ if __name__ == '__main__':
     aurocs = []
 
     for category in categories:
+        seed_everything(42)
         print('CATEGORY:', category)
         train_loader, test_loader = createDatasetDataloaders(args.dataset_dir, category, 16)
         model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
