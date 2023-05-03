@@ -14,6 +14,7 @@ def embedding_concat(embedding_1, embedding_2):
     embedding = torch.cat((embedding_1, embedding_2), dim=1)
     return embedding
 
+
 def reshape_embedding(embedding):
     embedding_list = []
     for k in range(embedding.shape[0]):
@@ -22,12 +23,15 @@ def reshape_embedding(embedding):
                 embedding_list.append(embedding[k, :, i, j])
     return embedding_list
 
+
 class Patchcore:
     def __init__(self, feature_extractor, coreset_sampling_ratio, device):
         self.coreset_sampling_ratio = coreset_sampling_ratio
         self.device = device
         self.feature_extractor = feature_extractor
+        self.feature_extractor.eval()
     
+    @torch.no_grad()
     def fit(self, data_loader):
         embedding_list = []
         
@@ -47,19 +51,20 @@ class Patchcore:
         selected_idx = selector.select_batch(model=self.randomprojector,
                                              already_selected=[],
                                              N=int(total_embeddings.shape[0] * self.coreset_sampling_ratio))
-        self.embedding_coreset = total_embeddings[selected_idx]
-        self.embedding_coreset = [torch.Tensor(x) for x in self.embedding_coreset]
+        self.embedding_coreset = torch.Tensor(total_embeddings[selected_idx])
 
-        print('initial embedding size : {}'.format(total_embeddings.shape))
-        print('final embedding size : {}'.format(self.embedding_coreset.shape))
-    
+
+    @torch.no_grad()
     def predict(self, data):
         assert len(data.shape) == 4
         assert data.shape[0] == 1
         features = self.feature_extractor(data)
         embedding = embedding_concat(features[0], features[1])
+        embedding = reshape_embedding(embedding)
+        embedding = torch.stack(embedding)
         distances = torch.cdist(embedding, self.embedding_coreset, p=2)
-        score_patches, _ = torch.topk(distances, k=9)
+        score_patches, _ = torch.topk(distances, k=9, largest=False)
+        score_patches = score_patches.numpy()
         N_b = score_patches[np.argmax(score_patches[:, 0])]
         w = (1 - (np.max(np.exp(N_b)) / np.sum(np.exp(N_b))))
         score = w * max(score_patches[:, 0])
