@@ -89,7 +89,6 @@ class kCenterGreedy(SamplingMethod):
 
             self.update_distances([ind], only_new=True, reset_dist=False)
             new_batch.append(ind)
-        print('Maximum distance from cluster centers is %0.2f' % max(self.min_distances))
 
         self.already_selected = already_selected
 
