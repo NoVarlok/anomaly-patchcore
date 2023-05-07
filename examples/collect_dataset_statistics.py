@@ -23,7 +23,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    categories = sorted(os.listdir(args.dataset_dir))
+    categories = [category for category in sorted(os.listdir(args.dataset_dir)) if os.path.isdir(os.path.join(args.dataset_dir, catetory))]
 
     processed_categories = []
     aurocs = []
