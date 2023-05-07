@@ -20,10 +20,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Videos to images')
     parser.add_argument('--dataset_dir', type=str)
     parser.add_argument('--output_report', type=str,)
+    parser.add_argument('--target_good_images', action='store_true')
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    categories = [category for category in sorted(os.listdir(args.dataset_dir)) if os.path.isdir(os.path.join(args.dataset_dir, catetory))]
+    categories = [category for category in sorted(os.listdir(args.dataset_dir)) if os.path.isdir(os.path.join(args.dataset_dir, category))]
 
     processed_categories = []
     aurocs = []
@@ -45,6 +46,8 @@ if __name__ == '__main__':
             labels.append(int(label[0]))
             scores.append(score)
         
+        if args.target_good_images:
+            labels = [label ^ 1 for label in labels]
         auroc = roc_auc_score(labels, scores)
         print('AUROC:', auroc)
         print()
