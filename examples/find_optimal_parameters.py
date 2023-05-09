@@ -15,6 +15,7 @@ import tarfile, io
 from sklearn.metrics import roc_auc_score
 from torchvision.models import resnet50, ResNet50_Weights
 from tqdm import tqdm
+from collections import defaultdict
 
 
 if __name__ == '__main__':
@@ -29,26 +30,29 @@ if __name__ == '__main__':
     categories = [category for category in sorted(os.listdir(args.dataset_dir)) if os.path.isdir(os.path.join(args.dataset_dir, category))]
 
     results = []
-    for use_pca in [True]:
-        for p_distance in [2.0]: #[0.1, 2.0, 5.0, 10.0]:
-            for n_patches in [1]: #[1, 3, 5, 10, 100]:
-                processed_categories = []
-                aurocs = []
-                for category in categories[:1]:
-                    seed_everything(42)
-                    print('CATEGORY:', category)
-                    train_loader, test_loader = createDatasetDataloaders(args.dataset_dir, category, 16)
-                    model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
-                    feature_extractor = ResNetFeatureExtractor(model, device=device)
-                    config = {
-                        "coreset_sampling_ratio": 0.1,
-                        "n_patches": n_patches,
-                        "p_distance": p_distance,
-                        "PCA": use_pca,
-                    }
-                    patchcore = Patchcore(feature_extractor, config, device)
-                    
-                    patchcore.fit(train_loader)
+    # Train params grid search
+    for use_pca in [False, True]:
+        processed_categories = defaultdict(list)
+        aurocs = defaultdict(list)
+        for category in categories[:1]:
+            print('CATEGORY:', category)
+            seed_everything(42)
+            train_loader, test_loader = createDatasetDataloaders(args.dataset_dir, category, 16)
+            model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+            feature_extractor = ResNetFeatureExtractor(model, device=device)
+            train_config = {
+                "coreset_sampling_ratio": 0.1,
+                "PCA": use_pca,
+            }
+            patchcore = Patchcore(feature_extractor, train_config, device)
+            
+            patchcore.fit(train_loader)
+
+            # Inference params grid search
+            for p_distance in [0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]:
+                for n_patches in [1, 3, 5, 10, 100]:
+                    patchcore.p_distance = p_distance
+                    patchcore.n_patches = n_patches
                     scores = []
                     labels = []
                     for i, data in enumerate(tqdm(test_loader)):
@@ -64,39 +68,43 @@ if __name__ == '__main__':
                     print('AUROC:', auroc)
                     print()
 
-                    processed_categories.append(category)
-                    aurocs.append(auroc)
-                
-                df = pd.DataFrame(data={'class': ['avg'] + processed_categories,
-                                        'auroc': [np.mean(aurocs)] + aurocs})
-                
-                results.append({
-                    "avg_auroc": np.mean(aurocs),
-                    "use_pca": use_pca,
-                    "p_distance": p_distance,
-                    "n_patches": n_patches,
-                    "dataframe": df,
-                })
+                    processed_categories[(p_distance, n_patches)].append(category)
+                    aurocs[(p_distance, n_patches)].append(auroc)
 
-                print("USE PCA:", use_pca)
-                print("P DISTANCE:", p_distance)
-                print("N PATCHES:", n_patches)
-                print(df.T.to_markdown())
+        for params in processed_categories:
+            p_distance, n_patches = params
+            df = pd.DataFrame(data={'class': ['avg'] + processed_categories[params],
+                                    'auroc': [np.mean(aurocs[params])] + aurocs[params]})
+            df = df.set_index('class')
 
-                results.sort(reverse=True, key=lambda x: x['avg_auroc'])
+            results.append({
+                "avg_auroc": np.mean(params),
+                "use_pca": use_pca,
+                "p_distance": p_distance,
+                "n_patches": n_patches,
+                "dataframe": df,
+            })
 
-                with open(args.output_report, "w") as fout:
-                    best_result = results[0]
-                    print("USE PCA:", best_result["use_pca"], file=fout)
-                    print("P DISTANCE:", best_result["p_distance"], file=fout)
-                    print("N PATCHES:", best_result["n_patches"], file=fout)
-                    print(best_result["dataframe"].T.to_markdown(), file=fout)
+            print("use_pca:", use_pca)
+            print("p_distance:", p_distance)
+            print("n_patches:", n_patches)
+            print(df.T.to_markdown())
+            print()
+
+        results.sort(reverse=True, key=lambda x: x['avg_auroc'])
+
+    with open(args.output_report, "w") as fout:
+        best_result = results[0]
+        print("use_pca:", best_result["use_pca"], file=fout)
+        print("p_distance:", best_result["p_distance"], file=fout)
+        print("n_patches:", best_result["n_patches"], file=fout)
+        print(best_result["dataframe"].T.to_markdown(), file=fout)
     
     with tarfile.open(args.grid_search_output_tar, "w:gz") as tar:
         data = '\n\n'.join(
-            [f"""USE PCA: {result['use_pca']}
-P DISTANCE: {result['p_distance']}
-N PATCHES: {result['n_patches']}
+            [f"""use_pca: {result['use_pca']}
+p_distance: {result['p_distance']}
+n_patches: {result['n_patches']}
 {result['dataframe'].T.to_markdown()}""" for result in results]
         )
         textIO = io.TextIOWrapper(io.BytesIO(), encoding='utf8')
