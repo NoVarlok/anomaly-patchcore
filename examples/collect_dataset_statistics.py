@@ -41,7 +41,8 @@ if __name__ == '__main__':
         scores = []
         labels = []
         for i, data in enumerate(tqdm(test_loader)):
-            img, gt, label, idx = data
+            # img, gt, label, idx = data
+            img, label, idx = data
             score = patchcore.predict(img)
             labels.append(int(label[0]))
             scores.append(score)

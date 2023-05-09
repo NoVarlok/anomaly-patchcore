@@ -37,7 +37,8 @@ class Patchcore:
         
         with torch.no_grad():
             for i, data in enumerate(data_loader):
-                img, gt, label, idx = data
+                # img, gt, label, idx = data
+                img, label, idx = data
                 img = img.to(self.device)
                 features = self.feature_extractor(img)
                 embedding = embedding_concat(features[0].cpu(), features[1].cpu()).numpy()
