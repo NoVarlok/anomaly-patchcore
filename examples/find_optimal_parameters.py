@@ -34,7 +34,7 @@ if __name__ == '__main__':
     for use_pca in [False, True]:
         processed_categories = defaultdict(list)
         aurocs = defaultdict(list)
-        for category in categories[:1]:
+        for category in categories:
             print('CATEGORY:', category)
             seed_everything(42)
             train_loader, test_loader = createDatasetDataloaders(args.dataset_dir, category, 16)
@@ -91,9 +91,8 @@ if __name__ == '__main__':
             print(df.T.to_markdown())
             print()
 
-        results.sort(reverse=True, key=lambda x: x['avg_auroc'])
-
     with open(args.output_report, "w") as fout:
+        results.sort(reverse=False, key=lambda x: x['avg_auroc'])
         best_result = results[0]
         print("use_pca:", best_result["use_pca"], file=fout)
         print("p_distance:", best_result["p_distance"], file=fout)
