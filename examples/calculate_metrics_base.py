@@ -19,6 +19,7 @@ from tqdm import tqdm
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Videos to images')
     parser.add_argument('--dataset_dir', type=str)
+    parser.add_argument('--config', type=str)
     parser.add_argument('--output_report', type=str,)
     parser.add_argument('--target_good_images', action='store_true')
     args = parser.parse_args()
@@ -42,7 +43,7 @@ if __name__ == '__main__':
         train_loader, test_loader = createDatasetDataloaders(args.dataset_dir, category, 16)
         model = wide_resnet50_2(weights=Wide_ResNet50_2_Weights.IMAGENET1K_V2)
         feature_extractor = ResNetFeatureExtractor(model, device=device)
-        patchcore = Patchcore(feature_extractor, 0.1, device)
+        patchcore = Patchcore(feature_extractor, args.config, device)
         
         patchcore.fit(train_loader)
         scores = []

@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from sklearn.random_projection import SparseRandomProjection
+from sklearn.decomposition import PCA
 from anomaly.algorithms.sampling_methods import kCenterGreedy
 
 
@@ -25,12 +26,31 @@ def reshape_embedding(embedding):
 
 
 class Patchcore:
-    def __init__(self, feature_extractor, coreset_sampling_ratio, device):
-        self.coreset_sampling_ratio = coreset_sampling_ratio
+    # def __init__(self, feature_extractor, coreset_sampling_ratio, device):
+    def __init__(self, feature_extractor, config, device):
         self.device = device
         self.feature_extractor = feature_extractor
         self.feature_extractor.eval()
+
+        self.n_patches = None
+        self.load_config(config)
     
+
+    def load_config(self, config):
+        if isinstance(config, str):
+            with open(config, 'r') as stream:
+                config_data = yaml.safe_load(stream)
+        else:
+            config_data = config
+        
+        self.coreset_sampling_ratio = config_data['coreset_sampling_ratio']
+        
+        # Optional
+        self.n_patches = config_data.get('n_patches', 1)
+        self.p_distance = config_data.get('p_distance', 2)
+        self.use_pca = config_data.get('PCA', False)
+
+
     @torch.no_grad()
     def fit(self, data_loader):
         embedding_list = []
@@ -46,11 +66,18 @@ class Patchcore:
                 embedding_list.extend(embedding)
 
         total_embeddings = np.array(embedding_list, dtype=np.float32)
-        self.randomprojector = SparseRandomProjection(n_components='auto', eps=0.9)
-        self.randomprojector.fit(total_embeddings)
+
+        if self.use_pca:
+            max_features = min(*total_embeddings.shape)
+            pca = PCA(n_components=max_features, random_state=42).fit(total_embeddings)
+            optimal_features = np.argmax(np.cumsum(pca.explained_variance_ratio_) > 0.95) + 1
+            self.projection = PCA(n_components=optimal_features, random_state=42).fit(total_embeddings)
+        else:
+            self.projection = SparseRandomProjection(n_components='auto', eps=0.9)
+            self.projection.fit(total_embeddings)
 
         selector = kCenterGreedy(total_embeddings, 0, 0)
-        selected_idx = selector.select_batch(model=self.randomprojector,
+        selected_idx = selector.select_batch(model=self.projection,
                                              already_selected=[],
                                              N=int(total_embeddings.shape[0] * self.coreset_sampling_ratio))
         self.embedding_coreset = torch.Tensor(total_embeddings[selected_idx])
@@ -68,8 +95,14 @@ class Patchcore:
         distances = torch.cdist(embedding, self.embedding_coreset, p=2)
         score_patches, _ = torch.topk(distances, k=9, largest=False)
         score_patches = score_patches.numpy()
-        N_b = score_patches[np.argmax(score_patches[:, 0])]
-        w = (1 - (np.max(np.exp(N_b)) / np.sum(np.exp(N_b))))
-        score = w * max(score_patches[:, 0])
+        
+        score = 0
+        for _ in range(min(self.n_patches, score_patches.shape[0])):
+            index = np.argmax(score_patches[:, 0])
+            N_b = score_patches[index]
+            w = (1 - (np.max(np.exp(N_b)) / np.sum(np.exp(N_b))))
+            score = w * max(score_patches[:, 0])
+            score_patches[index] = -np.inf
+
         return score
         
