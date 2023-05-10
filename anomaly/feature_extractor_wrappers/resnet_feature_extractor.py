@@ -1,5 +1,7 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
+
 from anomaly.feature_extractor_wrappers import BaseFeatureExtractor
 
 
@@ -41,10 +43,10 @@ class ResNetFeatureExtractor(BaseFeatureExtractor):
             x = layer(x)
             if i + 1 in self.layers:
                 features.append(x)
-                kernels.append(get_kernel(self.out_size[i]))
+                kernels.append(get_kernel(self.out_size[i]).to(self.device))
         
         if self.aggregation_fn == 'avg':
             features = [F.avg_pool2d(x, 3, 1, 1) for x in features]
         elif self.aggregation_fn == 'conv':
-            features = [f.conv2d(F.pad(x, ((0, 0), (0, 0), (1, 1), (1, 1)), "constant", 0), weight) for x, weight in zip(features, kernels)]
+            features = [F.conv2d(F.pad(x, (0, 0, 1, 1), "constant", 0), weight) for x, weight in zip(features, kernels)]
         return features
