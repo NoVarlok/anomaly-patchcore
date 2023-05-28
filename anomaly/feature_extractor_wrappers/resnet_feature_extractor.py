@@ -6,16 +6,17 @@ from anomaly.feature_extractor_wrappers import BaseFeatureExtractor
 
 
 def get_kernel(output_channels, kernel_size=3):
-    margin = kernel_size//2
+    margin = kernel_size // 2
     kernel = []
 
     for i in range(kernel_size):
         kernel_row = []
         for j in range(kernel_size):
-            kernel_elem = 1 - max(abs(margin - i), abs(margin - j)) * 0.2
+            kernel_elem = 0.5 ** (abs(margin - i) + abs(margin - j))
             kernel_row.append(kernel_elem)
         kernel.append(kernel_row)
     kernel_sq = np.array(kernel)
+    kernel_sq = kernel_sq / kernel_sq.sum()
     kernel = np.zeros((output_channels, output_channels, kernel_size, kernel_size))
     for i in range(output_channels):
         kernel[i][i] = kernel_sq

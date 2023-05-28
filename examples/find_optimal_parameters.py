@@ -16,6 +16,7 @@ from sklearn.metrics import roc_auc_score
 from torchvision.models import resnet50, ResNet50_Weights
 from tqdm import tqdm
 from collections import defaultdict
+from anomaly.datasets import preprocessings
 
 
 if __name__ == '__main__':
@@ -37,9 +38,12 @@ if __name__ == '__main__':
         for category in categories:
             print('CATEGORY:', category)
             seed_everything(42)
-            train_loader, test_loader = createDatasetDataloaders(args.dataset_dir, category, 16)
+            train_loader, test_loader = createDatasetDataloaders(args.dataset_dir,
+                                                                 category,
+                                                                 preprocessings.DefaultPreprocessing(preprocessings.DEFAULT_IMG_SIZE),
+                                                                 16)
             model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
-            feature_extractor = ResNetFeatureExtractor(model, device=device)
+            feature_extractor = ResNetFeatureExtractor(model, device=device, aggregation_fn='conv')
             train_config = {
                 "coreset_sampling_ratio": 0.1,
                 "PCA": use_pca,

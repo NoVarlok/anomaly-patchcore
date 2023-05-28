@@ -100,7 +100,8 @@ class Patchcore:
         for _ in range(min(self.n_patches, score_patches.shape[0])):
             index = np.argmax(score_patches[:, 0])
             N_b = score_patches[index]
-            w = (1 - (np.max(np.exp(N_b)) / np.sum(np.exp(N_b))))
+            # w = (1 - (np.max(np.exp(N_b)) / np.sum(np.exp(N_b))))
+            w = (1 - 1 / np.sum(np.exp(N_b - np.max(N_b))))
             score = w * max(score_patches[:, 0])
             score_patches[index] = -np.inf
 
